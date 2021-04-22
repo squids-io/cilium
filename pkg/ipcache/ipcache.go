@@ -15,6 +15,7 @@
 package ipcache
 
 import (
+	"github.com/cilium/cilium/pkg/node/types"
 	"net"
 
 	"github.com/cilium/cilium/pkg/controller"
@@ -252,6 +253,20 @@ func (ipc *IPCache) Upsert(ip string, hostIP net.IP, hostKey uint8, k8sMeta *K8s
 				logfields.K8sNamespace: k8sMeta.Namespace,
 				logfields.NamedPorts:   k8sMeta.NamedPorts,
 			})
+		}
+	}
+
+	// TODO add in this to over write vxlan udp rules
+	if k8sMeta != nil {
+		pod, err := types.PodLister.Pods(k8sMeta.Namespace).Get(k8sMeta.PodName)
+		if err != nil {
+			scopedLog.WithError(err).Errorln("get pod info by k8s meta failed, skip rewrite hostip. ", k8sMeta)
+		} else {
+			nextIP := types.GetNodeVpcAddr(pod.Spec.NodeName)
+			if nextIP != nil {
+				scopedLog.Infof("rewrite hostip from %s to %s. ", hostIP.String(), nextIP.String())
+				hostIP = nextIP
+			}
 		}
 	}
 
