@@ -17,6 +17,8 @@ const VpcLabel = "vpc.id"
 const VpcInternalIPAnnotation = "vpc.internal.ip"
 const VpcExternalIPAnnotation = "vpc.external.ip"
 
+const masterLabel = "node-role.kubernetes.io/master"
+
 /*
 由于使用k8s包会导致cycle引入，所以这里简单实现一个k8s client go，只需要实现nodeLister
 */
@@ -59,6 +61,24 @@ func GetNodeVpcConvert(srcIP string) net.IP {
 		}
 	}
 	return nil
+}
+
+func IsMaster(nodeName string) bool {
+	selfNode, err := nodeLister.Get(nodeName)
+	if err != nil {
+		log.WithError(err).Errorf("get self node %s info failed. ", GetName())
+		return false
+	}
+
+	if selfNode.Labels == nil {
+		return false
+	}
+
+	if _, ok := selfNode.Labels[masterLabel]; ok {
+		return true
+	}
+
+	return false
 }
 
 func GetNodeVpcAddr(nodeName string) net.IP {
