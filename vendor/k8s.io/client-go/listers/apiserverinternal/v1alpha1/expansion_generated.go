@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// PodPresetListerExpansion allows custom methods to be added to
-// PodPresetLister.
-type PodPresetListerExpansion interface{}
-
-// PodPresetNamespaceListerExpansion allows custom methods to be added to
-// PodPresetNamespaceLister.
-type PodPresetNamespaceListerExpansion interface{}
+// StorageVersionListerExpansion allows custom methods to be added to
+// StorageVersionLister.
+type StorageVersionListerExpansion interface{}
