@@ -1403,6 +1403,10 @@ func runDaemon() {
 		bootstrapStats.k8sInit.End(true)
 	}
 
+	if err := nodeTypes.InitVpc(k8s.Client()); err != nil {
+		log.WithError(err).Fatal("Unable to init vpc mod.")
+	}
+
 	d, restoredEndpoints, err := NewDaemon(server.ServerCtx,
 		WithDefaultEndpointManager(),
 		linuxdatapath.NewDatapath(datapathConfig, iptablesManager))
