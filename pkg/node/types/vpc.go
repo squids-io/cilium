@@ -2,15 +2,14 @@ package types
 
 import (
 	"context"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"net"
-	"os"
 	"time"
 
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	v12 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 const VpcLabel = "vpc.id"
@@ -25,34 +24,39 @@ const masterLabel = "node-role.kubernetes.io/master"
 
 var nodeLister v12.NodeLister
 var PodLister v12.PodLister
+var clientSet kubernetes.Interface
 
-func init() {
+func InitVpc(k8sClient kubernetes.Interface) error {
+	log.Debugf("Start init vpc mod.")
 
-	cf, err := clientcmd.BuildConfigFromFlags(os.Getenv("MASTER_URL"), os.Getenv("KUBECONFIG"))
-	if err != nil {
-		log.WithError(err).Errorf("init node lister failed. ")
-		return
-	}
+	clientSet = k8sClient
 
-	clientSet := kubernetes.NewForConfigOrDie(cf)
-
-	shardFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, time.Hour)
+	shardFactory := informers.NewSharedInformerFactoryWithOptions(k8sClient, time.Hour)
 
 	nodeLister = shardFactory.Core().V1().Nodes().Lister()
 	PodLister = shardFactory.Core().V1().Pods().Lister()
 
 	go shardFactory.Start(context.Background().Done())
 
-	shardFactory.WaitForCacheSync(context.Background().Done())
+	for t, ok := range shardFactory.WaitForCacheSync(context.Background().Done()) {
+		if !ok {
+			log.Errorf("Init vpc sharedFactory failed to wait %v ready", t)
+		}
+	}
+
+	log.Debugf("Init vpc mod done.")
+	return nil
 }
 
 func GetNodeVpcConvert(srcIP string) net.IP {
+	log.Debugf("Get node list for svc. %#v", srcIP)
+
 	nodeList, err := nodeLister.List(labels.Everything())
 	if err != nil {
-		log.WithError(err).Errorln("get node list failed. ")
+		log.WithError(err).Errorln("Get node list failed. ")
 		return nil
 	}
-	log.Debugf("get current node list %d. ", len(nodeList))
+	log.Debugf("Get current node list %d. ", len(nodeList))
 	for _, n := range nodeList {
 		for _, ip := range n.Status.Addresses {
 			if ip.Address == srcIP {
@@ -66,7 +70,7 @@ func GetNodeVpcConvert(srcIP string) net.IP {
 func IsMaster(nodeName string) bool {
 	selfNode, err := nodeLister.Get(nodeName)
 	if err != nil {
-		log.WithError(err).Errorf("get self node %s info failed. ", GetName())
+		log.WithError(err).Errorf("Get self node %s info failed. ", GetName())
 		return false
 	}
 
@@ -83,20 +87,20 @@ func IsMaster(nodeName string) bool {
 
 func GetNodeVpcAddr(nodeName string) net.IP {
 	if nodeLister == nil {
-		log.Warningf("node vpc lister is not init, skip. ")
+		log.Warningf("Node vpc lister is not init, skip. ")
 		return nil
 	}
 
 	// TODO add vpc lan
 	var nextNodeIP net.IP
-	selfNode, err := nodeLister.Get(GetName())
+	selfNode, err := clientSet.CoreV1().Nodes().Get(context.Background(), GetName(), v1.GetOptions{})
 	if err != nil {
-		log.WithError(err).Errorf("get self node %s info failed. ", GetName())
+		log.WithError(err).Errorf("Get self node %s info failed. ", GetName())
 		return nil
 	}
-	nextNode, err := nodeLister.Get(nodeName)
+	nextNode, err := clientSet.CoreV1().Nodes().Get(context.Background(), nodeName, v1.GetOptions{})
 	if err != nil {
-		log.WithError(err).Errorf("get next node %s info failed. ", nodeName)
+		log.WithError(err).Errorf("Get next node %s info failed. ", nodeName)
 		return nil
 	}
 
@@ -115,12 +119,12 @@ func GetNodeVpcAddr(nodeName string) net.IP {
 
 	if selfVpc == nextVpc && nextNode.Annotations[VpcInternalIPAnnotation] != "" {
 		nextNodeIP = net.ParseIP(nextNode.Annotations[VpcInternalIPAnnotation]).To4()
-		log.Infof("got same vpc to next node[%s], use internal ip %s. ", nextNode.Name, nextNodeIP.String())
+		log.Infof("Got same vpc to next node[%s], use internal ip %s. ", nextNode.Name, nextNodeIP.String())
 		return nextNodeIP
 	}
 	if selfVpc != nextVpc && nextNode.Annotations[VpcExternalIPAnnotation] != "" {
 		nextNodeIP = net.ParseIP(nextNode.Annotations[VpcExternalIPAnnotation]).To4()
-		log.Infof("got diff vpc to next node[%s], use external ip %s. ", nextNode.Name, nextNodeIP.String())
+		log.Infof("Got diff vpc to next node[%s], use external ip %s. ", nextNode.Name, nextNodeIP.String())
 		return nextNodeIP
 	}
 	return nil

@@ -261,11 +261,11 @@ func (ipc *IPCache) Upsert(ip string, hostIP net.IP, hostKey uint8, k8sMeta *K8s
 	if k8sMeta != nil {
 		pod, err := types.PodLister.Pods(k8sMeta.Namespace).Get(k8sMeta.PodName)
 		if err != nil {
-			scopedLog.WithError(err).Errorln("get pod info by k8s meta failed, skip rewrite hostip. ", k8sMeta)
+			scopedLog.WithError(err).Errorln("Get pod info by k8s meta failed, skip rewrite hostip. ", k8sMeta)
 		} else {
 			nextIP := types.GetNodeVpcAddr(pod.Spec.NodeName)
 			if nextIP != nil {
-				scopedLog.Infof("rewrite hostip from %s to %s. ", hostIP.String(), nextIP.String())
+				scopedLog.Infof("Rewrite hostip from %s to %s. ", hostIP.String(), nextIP.String())
 				hostIP = nextIP
 			}
 		}

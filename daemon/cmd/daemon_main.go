@@ -1566,6 +1566,10 @@ func runDaemon() {
 		bootstrapStats.k8sInit.End(true)
 	}
 
+	if err := nodeTypes.InitVpc(k8s.Client()); err != nil {
+		log.WithError(err).Fatal("Unable to init vpc mod.")
+	}
+
 	ctx, cancel := context.WithCancel(server.ServerCtx)
 	d, restoredEndpoints, err := NewDaemon(ctx, cancel,
 		WithDefaultEndpointManager(ctx, endpoint.CheckHealth),
@@ -1592,6 +1596,7 @@ func runDaemon() {
 	gc.Enable(option.Config.EnableIPv4, option.Config.EnableIPv6,
 		restoredEndpoints.restored, d.endpointManager)
 	bootstrapStats.enableConntrack.End(true)
+	log.Info("aaaaa")
 
 	bootstrapStats.k8sInit.Start()
 	if k8s.IsEnabled() {
@@ -1624,7 +1629,7 @@ func runDaemon() {
 		}
 		ipmasqAgent.Start()
 	}
-
+	log.Info("dddddd")
 	if !option.Config.DryMode {
 		go func() {
 			if restoreComplete != nil {
@@ -1641,7 +1646,7 @@ func runDaemon() {
 		d.endpointManager.Subscribe(d)
 		defer d.endpointManager.Unsubscribe(d)
 	}
-
+	log.Info("eeeee")
 	// Migrating the ENI datapath must happen before the API is served to
 	// prevent endpoints from being created. It also must be before the health
 	// initialization logic which creates the health endpoint, for the same
@@ -1666,7 +1671,7 @@ func runDaemon() {
 				migrated)
 		}
 	}
-
+	log.Info("fffff")
 	bootstrapStats.healthCheck.Start()
 	if option.Config.EnableHealthChecking {
 		d.initHealth()
@@ -1683,7 +1688,7 @@ func runDaemon() {
 			d.startKubeProxyHealthzHTTPService(fmt.Sprintf("%s", option.Config.KubeProxyReplacementHealthzBindAddr))
 		}
 	}
-
+	log.Info("ggggg")
 	bootstrapStats.initAPI.Start()
 	srv := server.NewServer(d.instantiateAPI())
 	srv.EnabledListeners = []string{"unix"}
