@@ -5,6 +5,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"net"
+	"strings"
 	"time"
 
 	"k8s.io/client-go/informers"
@@ -17,6 +18,7 @@ const VpcInternalIPAnnotation = "vpc.internal.ip"
 const VpcExternalIPAnnotation = "vpc.external.ip"
 
 const masterLabel = "node-role.kubernetes.io/master"
+const clusterLabel = "squids/cluster"
 
 /*
 由于使用k8s包会导致cycle引入，所以这里简单实现一个k8s client go，只需要实现nodeLister
@@ -79,6 +81,33 @@ func IsMaster(nodeName string) bool {
 	}
 
 	if _, ok := selfNode.Labels[masterLabel]; ok {
+		return true
+	}
+
+	return false
+}
+
+func IsSameVpc(label string) bool {
+	if label == "" {
+		return false
+	}
+	selfNode, err := nodeLister.Get(GetName())
+	if err != nil {
+		log.WithError(err).Errorf("Get self node %s info failed. ", GetName())
+		return false
+	}
+
+	if selfNode.Labels == nil {
+		return false
+	}
+	clusterLabel, ok := selfNode.Labels[clusterLabel]
+	if !ok {
+		return false
+	}
+
+	log.Infof("Got svc label[%s] to node label[%s]", label, clusterLabel)
+
+	if strings.Split(clusterLabel, "-")[1] == strings.Split(label, "-")[1] {
 		return true
 	}
 
